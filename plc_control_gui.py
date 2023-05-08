@@ -1,6 +1,6 @@
 import paho.mqtt.client as mqtt
 import struct
-from plc_control import serialize, on_connect
+from plc_control import serialize
 import tkinter as tk
 import tkinter.ttk as ttk
 
@@ -16,12 +16,12 @@ class GUI(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("PLC Control")
-        self.geometry("500x100")
+        self.geometry("400x125")
         self.resizable(False, False)
 
         self.out_states = [tk.BooleanVar(value=False) for _ in range(PIN_CNT)]
         self.client = mqtt.Client()
-        self.client.on_connect = on_connect
+        self.client.on_connect = lambda: self.lbl_status.config(text='Connected to mqtt broker')
         self.client.connect_async(HOST, PORT, KEEPALIVE)
         self.client.loop_start()
         self.create_widgets()
@@ -46,8 +46,13 @@ class GUI(tk.Tk):
         self.btn_send = tk.Button(self.frm_buttons, text="Send", command=self.send)
         self.btn_send.grid(row=0, column=2)
 
-        self.btn_debug = tk.Button(self, text="Debug", command=self.debug) # will probably be removed later
-        self.btn_debug.place(x=0, y=60)
+        self.frm_status = tk.Frame(self)
+        self.frm_status.pack(anchor=tk.W, padx=10, pady=5)
+        self.lbl_status = tk.Label(self.frm_status, text='Waiting for connection...')
+        self.lbl_status.pack()
+
+        # self.btn_debug = tk.Button(self, text="Debug", command=self.debug) # will probably be removed later
+        # self.btn_debug.place(x=0, y=60)
 
     def send(self):
         # states = serialize(self.out_states) # won't work, because these are not regular bools but some weird wrappers
@@ -57,12 +62,19 @@ class GUI(tk.Tk):
         s = struct.pack('<H', states)
         info = self.client.publish(TOPIC, s)
         info.wait_for_publish(TIMEOUT)
+        self.lbl_status.config(text='Sending...')
+        if info.is_published():
+            self.lbl_status.config(text='Sent successfully')
+        else:
+            self.lbl_status.config(text='Sending failed!!')
 
     def reset(self):
         for state in self.out_states: state.set(False)
+        self.lbl_status.config(text='States reset')
 
     def christmas(self):
         for state in self.out_states: state.set(True)
+        self.lbl_status.config(text='Christmas tree! ^_^')
 
     def debug(self):
         for state in self.out_states: print(state.get(), end=' ')
