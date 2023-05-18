@@ -1,8 +1,6 @@
 import paho.mqtt.client as mqtt
 import struct
-from plc_control import serialize
 import tkinter as tk
-import tkinter.ttk as ttk
 
 HOST = "localhost"
 PORT = 1883
@@ -11,6 +9,13 @@ TIMEOUT = 2
 KEEPALIVE = 60
 
 PIN_CNT = 10
+
+def serialize(states):
+    number = 0
+    for i in range(PIN_CNT):
+        if (states[i]):
+            number |= (1 << i)
+    return number
 
 class GUI(tk.Tk):
     def __init__(self):
@@ -21,7 +26,6 @@ class GUI(tk.Tk):
 
         self.out_states = [tk.BooleanVar(value=False) for _ in range(PIN_CNT)]
         self.client = mqtt.Client()
-        self.client.on_connect = lambda: self.lbl_status.config(text='Connected to mqtt broker')
         self.client.connect_async(HOST, PORT, KEEPALIVE)
         self.client.loop_start()
         self.create_widgets()
@@ -31,10 +35,10 @@ class GUI(tk.Tk):
         self.frm_cbs.pack(anchor=tk.CENTER)
         self.frm_grid_cbs = [tk.Frame(self.frm_cbs, border=4) for _ in self.out_states]
         for i, frm in enumerate(self.frm_grid_cbs): frm.grid(row=0, column=i)
-        self.cbs_statebuttons = [tk.Checkbutton(self.frm_grid_cbs[i], variable=state, onvalue=True, offvalue=False, anchor=tk.CENTER) for i, state in enumerate(self.out_states)] # might try making these pretty LEDs later 😎
+        self.cbs_statebuttons = [tk.Checkbutton(self.frm_grid_cbs[i], variable=state, onvalue=True, offvalue=False, anchor=tk.CENTER) for i, state in enumerate(self.out_states)]
         for i, cb in enumerate(self.cbs_statebuttons): cb.grid(row=0, column=1)
-        self.lbl_pinlabels = [tk.Label(self.frm_grid_cbs[i], text=str(i), anchor=tk.CENTER, justify="center") for i in range(PIN_CNT)] # having to use a nasty hack just to move labels to the bottom of the buttons, really classy tkinter 🙄
-        for i, lbl in enumerate(self.lbl_pinlabels): lbl.grid(row=1, column=1) # labels don't want to be centered for some reason 😒
+        self.lbl_pinlabels = [tk.Label(self.frm_grid_cbs[i], text=str(i), anchor=tk.CENTER, justify="center") for i in range(PIN_CNT)]
+        for i, lbl in enumerate(self.lbl_pinlabels): lbl.grid(row=1, column=1)
 
         self.frm_buttons = tk.Frame(self)
         self.frm_buttons.pack(anchor=tk.CENTER)
@@ -48,14 +52,10 @@ class GUI(tk.Tk):
 
         self.frm_status = tk.Frame(self)
         self.frm_status.pack(anchor=tk.W, padx=10, pady=5)
-        self.lbl_status = tk.Label(self.frm_status, text='Waiting for connection...')
+        self.lbl_status = tk.Label(self.frm_status, text='')
         self.lbl_status.pack()
 
-        # self.btn_debug = tk.Button(self, text="Debug", command=self.debug) # will probably be removed later
-        # self.btn_debug.place(x=0, y=60)
-
     def send(self):
-        # states = serialize(self.out_states) # won't work, because these are not regular bools but some weird wrappers
         states = [state.get() for state in self.out_states]
         states = serialize(states)
 
